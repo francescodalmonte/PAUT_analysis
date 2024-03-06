@@ -37,9 +37,9 @@ class PAUT_Data():
         return infoDict
 
 
-    def __get_linearCscan__(self, i: int, measurement: str = "A"):
+    def __get_gatedCscan__(self, i: int, measurement: str = "A", gate_subdir="Gate A"):
         """
-        Read linear C-Scan .npy files from file.
+        Read gated C-Scan .npy files from file.
         
         Parameters
         ----------
@@ -57,7 +57,7 @@ class PAUT_Data():
                   "A_ERR" : "Amplitude C-Bild [Amplitude]_C_SCAN_ERRORINFO.npy",
                   "P_ERR" : "Position C-Bild [Position]_C_SCAN.npy_ERRORINFO"}
         
-        filepath = os.path.join(self.dirpath, f"{self.Ldirs[i]}/Gate A/{fnames[measurement]}")
+        filepath = os.path.join(self.dirpath, f"{self.Ldirs[i]}/{gate_subdir}/{fnames[measurement]}")
         return np.load(filepath)[0]
     
 
@@ -86,9 +86,9 @@ class PAUT_Data():
             return np.load(filepath)[0]
 
 
-    def compose_totCscan(self, measurement = "A"):
+    def compose_gatedCscan(self, measurement = "A", gate_subdir="Gate A"):
         """
-        Compose a total C-Scan by looping over all the linear C-Scans of the acquisition,
+        Compose a total C-Scan by looping over all the gated C-Scans of the acquisition,
         and stacking 1-d arrays on a new axis.
 
         Parameters
@@ -102,7 +102,7 @@ class PAUT_Data():
         """
         Cscan = []
         for i in range(len(self.Ldirs)):
-            Cscan.append(self.__get_linearCscan__(i, measurement = "A"))
+            Cscan.append(self.__get_gatedCscan__(i, measurement, gate_subdir))
 
         return np.array(Cscan)
 
