@@ -1,23 +1,136 @@
 import os
 import numpy as np
+import pandas as pd
 import matplotlib.axes
 from matplotlib import pyplot as plt
 
 class PAUT_Data():
     """Base class for PAUT data"""
 
-    def __init__(self, dirpath: str):
+    def __init__(self, dirpath: str, labelpath: str = None):
         self.dirpath = dirpath
+
+        # acquisition name
+        self.acquisition_name = os.path.split(os.path.dirname(self.dirpath))[1]
 
         # list of L-elements directories is read and sorted (according to LXXX number)
         self.Ldirs = np.array([d for d in os.listdir(self.dirpath) if d.startswith("Linear")])
         Ldirs_number = np.array([int(d.split(" ")[2][1:]) for d in self.Ldirs])
         self.Ldirs = self.Ldirs[Ldirs_number.argsort()]
 
+        # metadata
+        if labelpath is not None:
+            self.labelpath = labelpath
+            self.metadata = self.get_metadata()
 
-    def __get_info__(self):
+
+    def checklabels(self, csv: pd.DataFrame):
+        if len(csv)==0:
+            raise ValueError("No data found in labels file.")
+        if not (np.all(csv["x Start"] == csv["x Start"].values[0])
+                and np.all(csv["x Ende"] == csv["x Ende"].values[0])):
+            raise ValueError("x Start and x Ende are not constant (or may contain nans).")
+        elif not (np.all(csv["Tiefe Start"] == csv["Tiefe Start"].values[0])
+                  and np.all(csv["Tiefe Ende"] == csv["Tiefe Ende"].values[0])):
+            raise ValueError("Tiefe Start and Tiefe Ende are not constant (or may contain nans).")
+        elif not np.all(csv["X-Pos."] == csv["X-Pos."]):
+            raise ValueError("X-Pos. contains nans.") 
+        elif not np.all(csv["Y-Pos."] == csv["Y-Pos."]):
+            raise ValueError("Y-Pos. contains nans.")
+        elif not np.all(csv["Tiefe t"] == csv["Tiefe t"]):
+            raise ValueError("Tiefe t contains nans.")
+        else:
+            return 0
+
+
+    def get_labelsFromCSV(self):
         """
-        Returns a dict with general info regarding the object.
+        Get labels info from .csv file.
+        """
+        if os.path.isfile(self.labelpath):
+            csv = pd.read_csv(self.labelpath, encoding='latin')
+            if self.acquisition_name in csv["Filename"].values:
+                csv = csv[csv["Filename"] == self.acquisition_name]
+                self.checklabels(csv)
+                return csv
+            else:
+                raise ValueError("Acquisition name not found in labels file.")
+        else:
+            raise FileNotFoundError("Labels file not found.")
+
+
+    def get_metadata(self):
+        """
+        Get metadata from the acquisition (e.g. valid x_pos etc.).
+        """
+        Cerr = self.get_gatedCscan(0, "A_ERR")
+        Ascan = self.get_linearAscans(0)
+
+        labels = self.get_labelsFromCSV()
+        x_start_mm = labels["x Start"].values[0]
+        x_end_mm = labels["x Ende"].values[0]
+        y_start_mm = -43.4                        # ****to be updated when available****
+        y_end_mm = 17.1                           # ****to be updated when available****
+        t_start_mm = labels["Tiefe Start"].values[0]
+        t_end_mm = labels["Tiefe Ende"].values[0]
+        angle = int(labels["Angle"].values[0].strip("°"))
+
+        # x position 
+        x_N = len(Cerr)
+        x_valid_lim  = [np.min(np.argwhere(Cerr[4:]==0))+3, np.max(np.argwhere(Cerr==0))]
+        x_valid_lim_mm = [x_start_mm, x_end_mm]
+        x_res = (x_valid_lim_mm[1]-x_valid_lim_mm[0])/(x_valid_lim[1]-x_valid_lim[0])
+
+        # y position
+        y_N = 115
+        y_lim_mm = [y_start_mm, y_end_mm]
+        y_res = (y_lim_mm[1]-y_lim_mm[0])/y_N
+
+        # t position
+        t_N = Ascan.shape[1]
+        t_lim_mm = [t_start_mm, t_end_mm]
+        t_res = (t_lim_mm[1]-t_lim_mm[0])/t_N
+        
+        return {"x_N" : x_N,
+                "y_N" : y_N,
+                "t_N" : t_N,
+                "x_valid_lim" : x_valid_lim,
+                "x_valid_lim_mm" : x_valid_lim_mm,
+                "x_res" : x_res,
+                "t_lim_mm" : t_lim_mm,
+                "t_res" : t_res,
+                "y_lim_mm" : y_lim_mm,
+                "y_res" : y_res,
+                "angle" : angle
+        }
+    
+
+    # coordinates conversions
+    def xmm_to_idx(self, xmm):
+        idx = (xmm-self.metadata["x_valid_lim_mm"][0])/self.metadata["x_res"] + self.metadata["x_valid_lim"][0]
+        return int(np.round(idx))
+    
+    def idx_to_xmm(self, idx):
+        return idx*self.metadata["x_res"] + self.metadata["x_valid_lim_mm"][0]
+    
+    def ymm_to_idx(self, ymm):
+        idx = (ymm-self.metadata["y_lim_mm"][0])/self.metadata["t_res"]
+        return int(np.round(idx))
+    
+    def idx_to_ymm(self, idx):
+        return (self.metadata["t_N"] -idx)*self.metadata["y_res"] + self.metadata["y_lim_mm"][0]
+
+    def tmm_to_idx(self, tmm):
+        idx = (tmm-self.metadata["t_lim_mm"][0])/self.metadata["t_res"]
+        return int(np.round(idx))
+
+    def idx_to_tmm(self, idx):
+        return idx*self.metadata["t_res"] + self.metadata["t_lim_mm"][0]
+
+        
+    def get_stats(self):
+        """
+        Returns a dict with statistics (e.g. data shape, amplitude range, mean, percentiles etc.).
         """
         ascans = self.compose_Ascans()
         ascans_shape = ascans.shape
@@ -37,7 +150,7 @@ class PAUT_Data():
         return infoDict
 
 
-    def __get_gatedCscan__(self, i: int, measurement: str = "A", gate_subdir="Gate A"):
+    def get_gatedCscan(self, i: int, measurement: str = "A", gate_subdir="Gate A"):
         """
         Read gated C-Scan .npy files from file.
         
@@ -52,17 +165,29 @@ class PAUT_Data():
 
 
         """
-        fnames = {"A" : "Amplitude C-Bild [Amplitude]_C_SCAN.npy",
-                  "P" : "Position C-Bild [Position]_C_SCAN.npy",
-                  "A_ERR" : "Amplitude C-Bild [Amplitude]_C_SCAN_ERRORINFO.npy",
-                  "P_ERR" : "Position C-Bild [Position]_C_SCAN.npy_ERRORINFO"}
+        fnames = {"A" : ["Amplitude C-Bild [Amplitude]_C_SCAN.npy",
+                         "Amplitude C-scan [Amplitude]_C_SCAN.npy"],
+                  "P" : ["Position C-Bild [Position]_C_SCAN.npy",
+                         "Position C-scan [Position]_C_SCAN.npy"],
+                  "A_ERR" : ["Amplitude C-Bild [Amplitude]_C_SCAN_ERRORINFO.npy",
+                             "Amplitude C-scan [Amplitude]_C_SCAN_ERRORINFO.npy"],
+                  "P_ERR" : ["Position C-Bild [Position]_C_SCAN.npy_ERRORINFO",
+                             "Position C-scan [Position]_C_SCAN.npy_ERRORINFO"]
+        }
         
-        filepath = os.path.join(self.dirpath, f"{self.Ldirs[i]}/{gate_subdir}/{fnames[measurement]}")
-        return np.load(filepath)[0]
+        try:
+            filepath = os.path.join(self.dirpath, f"{self.Ldirs[i]}/{gate_subdir}/{fnames[measurement][0]}")
+            npyfile = np.load(filepath)[0]
+            return npyfile
+        except:
+            filepath = os.path.join(self.dirpath, f"{self.Ldirs[i]}/{gate_subdir}/{fnames[measurement][1]}")
+            npyfile = np.load(filepath)[0]
+            return npyfile
+
     
 
 
-    def __get_linearAscans__(self, i: int):
+    def get_linearAscans(self, i: int):
         """
         Read linear A-Scans .npy file from file.
         
@@ -102,7 +227,7 @@ class PAUT_Data():
         """
         Cscan = []
         for i in range(len(self.Ldirs)):
-            Cscan.append(self.__get_gatedCscan__(i, measurement, gate_subdir))
+            Cscan.append(self.get_gatedCscan(i, measurement, gate_subdir))
 
         return np.array(Cscan)
 
@@ -120,7 +245,7 @@ class PAUT_Data():
         """
         tot_Ascans = []
         for i in range(len(self.Ldirs)):
-            tot_Ascans.append(self.__get_linearAscans__(i))
+            tot_Ascans.append(self.get_linearAscans(i))
 
         return np.array(tot_Ascans)
 

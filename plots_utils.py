@@ -79,8 +79,8 @@ def plot_Bscan_wcorrection(data: np.ndarray,
                            idx: int,
                            ax: matplotlib.axes.Axes,
                            angle: int,
-                           res_depth: float,
-                           pitch: float,
+                           res_depth: float, # resolution in vertical dimension
+                           pitch: float, # resolution in horizontal direction
                            title: str = "B-Scan",
                            th: float = 0., 
                            **kwargs):
@@ -95,51 +95,66 @@ def plot_Bscan_wcorrection(data: np.ndarray,
 
         # preliminar computation of transformation parameters
         angle_rad = angle*np.pi/180
-        res_x = pitch*np.cos(angle_rad)
-        res_y = res_depth/np.cos(angle_rad)
+        res_y = res_depth/np.cos(angle_rad) # resolution in oblique direction
+
         shearY = pitch*np.sin(angle_rad)/res_y
+        shearY_r = int(np.round(shearY*10, 0)) # rounded shear value
+
+        angle_hat_rad = np.arcsin(shearY_r*res_y/(pitch*10)) # real angle
+        angle_hat = angle_hat_rad*180/np.pi
+
+        res_x = pitch*np.cos(angle_hat_rad) 
         rXY_factor = res_x/res_y
 
-
-        print(f"angle: {angle}, res_x: {res_x}, res_y: {res_y}, shearY: {shearY}")
-
+        #cv.imwrite("C:/Users/dalmonte/data/0_data.jpg", th_data)
 
         # SHEAR MAPPING (y axis)
         rows, cols = th_data.shape
         # upsample 10x in y direction (enables a more precise shear mapping)
         th_data = cv.resize(th_data.copy(), dsize = None,
-                            fx=1., fy=10., interpolation=cv.INTER_LINEAR)
-        shearY_r = int(np.round(shearY*10, 0))
+                            fx=1., fy=10., interpolation=cv.INTER_AREA)
+        #cv.imwrite("C:/Users/dalmonte/data/1_data_upsampling1.jpg", th_data)
+
         # preliminar padding 
         th_data = np.pad(th_data, ((0, shearY_r*(cols-1)), (0, 0)),
                          mode='constant', constant_values=np.nan)
+        #cv.imwrite("C:/Users/dalmonte/data/2_data_padding.jpg", th_data)
+
         # shear mapping
         # (each column is manually shifted donwwards by a factor proportional to column index)
-        for col in range(cols):
-            th_data[:, col] = np.roll(th_data[:, col], shearY_r*(col))
+        for col_idx in range(cols):
+            th_data[:, col_idx] = np.roll(th_data[:, col_idx], shearY_r*(col_idx))
+
+        cv.imwrite("C:/Users/dalmonte/data/3_data_shearing.jpg", th_data)
         # downsample back to original resolution
-        th_data = cv.resize(th_data, dsize = None, fx=1., fy=0.1, interpolation=cv.INTER_AREA)
+        th_data = cv.resize(th_data, dsize = None, fx=1., fy=0.1, interpolation=cv.INTER_LINEAR)
+        #cv.imwrite("C:/Users/dalmonte/data/4_data_downsampling.jpg", th_data)
 
         # UPSAMPLING OF x AXIS (to match y resolution)
-        th_data = cv.resize(th_data, dsize = None, fx=rXY_factor, fy=1., interpolation=cv.INTER_LINEAR)
+        th_data = cv.resize(th_data, dsize = None, fx=rXY_factor, fy=1., interpolation=cv.INTER_AREA)
+        #cv.imwrite("C:/Users/dalmonte/data/5_data_upsampling2.jpg", th_data)
 
         # ROTATION
-        M_rotation = cv.getRotationMatrix2D([0,0], angle, scale=1)
+        print(angle_hat)
+
+        M_rotation = cv.getRotationMatrix2D([0,0], angle_hat, scale=1)
         rows_m, cols_m = th_data.shape
-        out_shape = (int(cols_m*np.cos(angle_rad)+rows_m*(np.sin(angle_rad))),
-                     int(rows_m*np.cos(angle_rad)-cols_m*(np.sin(angle_rad))))
+        out_shape = (int(cols_m*np.cos(angle_hat_rad)+rows_m*(np.sin(angle_hat_rad))),
+                     int(rows_m*np.cos(angle_hat_rad)-cols_m*(np.sin(angle_hat_rad))))
         th_data = cv.warpAffine(th_data, M_rotation, out_shape,
                                 borderMode=cv.BORDER_CONSTANT, borderValue = np.nan)
-                
+        
+        cv.imwrite("C:/Users/dalmonte/data/6_data_rotation.jpg", th_data)
+        # UPSAMPLE TO MATCH ORIGINAL Y-AXIS RESOLUTION
+        upsample_factor = rows/out_shape[1]
+        th_data = cv.resize(th_data, dsize = None, fx=upsample_factor, fy=upsample_factor, interpolation=cv.INTER_AREA)
+        cv.imwrite("C:/Users/dalmonte/data/7_data_upsampling3.jpg", th_data)
     ax.imshow(th_data, aspect='equal', **kwargs)
 
-    #x_axis_mm = np.arange(0, out_shape[0]*res_x, res_x)
-    #y_axis_mm = np.arange(0, out_shape[1]*res_y, res_y)
-
-    ax.set_xticks(np.linspace(0, out_shape[0], 10),
-                  np.round(np.linspace(0, out_shape[0], 10)*res_y, 1))
-    ax.set_yticks(np.linspace(0, out_shape[1], 6),
-                  np.round(np.linspace(0, out_shape[1], 6)*res_y, 1))
+    ax.set_xticks(np.linspace(0, th_data.shape[1], 10),
+                  np.round(np.linspace(0, th_data.shape[1], 10)*res_depth, 1))
+    ax.set_yticks(np.linspace(0, th_data.shape[0], 6),
+                  np.round(np.linspace(0, th_data.shape[0], 6)*res_depth, 1))
     ax.set_ylabel("Depth [mm]")
     ax.set_xlabel("y [mm]")
     ax.set_title(title)
