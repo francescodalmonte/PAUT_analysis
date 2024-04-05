@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.axes
 from matplotlib import pyplot as plt
+import cv2 as cv
 
 class PAUT_Data():
     """Base class for PAUT data"""
@@ -35,10 +36,16 @@ class PAUT_Data():
             raise ValueError("Tiefe Start and Tiefe Ende are not constant (or may contain nans).")
         elif not np.all(csv["X-Pos."] == csv["X-Pos."]):
             raise ValueError("X-Pos. contains nans.") 
-        elif not np.all(csv["Y-Pos."] == csv["Y-Pos."]):
-            raise ValueError("Y-Pos. contains nans.")
-        elif not np.all(csv["Tiefe t"] == csv["Tiefe t"]):
-            raise ValueError("Tiefe t contains nans.")
+        #elif not np.all(csv["Y-Pos."] == csv["Y-Pos."]):   # ****to be updated when available****
+        #    raise ValueError("Y-Pos. contains nans.")      # ****to be updated when available****
+        #elif not np.all(csv["Z-Pos."] == csv["Z-Pos."]):
+        #    raise ValueError("Z-Pos. contains nans.")      # ****to be updated when available****
+        elif not np.all(csv["Länge l"] == csv["Länge l"]):
+            raise ValueError("Länge l contains nans.")
+        #elif not np.all(csv["Breite b"] == csv["Breite b"]):
+        #    raise ValueError("Breite b contains nans.")    # ****to be updated when available****
+        #elif not np.all(csv["Tiefe t"] == csv["Tiefe t"]):
+        #    raise ValueError("Tiefe t contains nans.")     # ****to be updated when available****
         else:
             return 0
 
@@ -69,15 +76,15 @@ class PAUT_Data():
         labels = self.get_labelsFromCSV()
         x_start_mm = labels["x Start"].values[0]
         x_end_mm = labels["x Ende"].values[0]
-        y_start_mm = -43.4                        # ****to be updated when available****
-        y_end_mm = 17.1                           # ****to be updated when available****
+        y_start_mm = labels["y Start"].values[0]  # ****to be updated when available****
+        y_end_mm = labels["y Ende"].values[0]     # ****to be updated when available****
         t_start_mm = labels["Tiefe Start"].values[0]
         t_end_mm = labels["Tiefe Ende"].values[0]
         angle = int(labels["Angle"].values[0].strip("°"))
 
         # x position 
         x_N = len(Cerr)
-        x_valid_lim  = [np.min(np.argwhere(Cerr[4:]==0))+3, np.max(np.argwhere(Cerr==0))]
+        x_valid_lim  = [np.min(np.argwhere(Cerr==0)), np.max(np.argwhere(Cerr==0))]
         x_valid_lim_mm = [x_start_mm, x_end_mm]
         x_res = (x_valid_lim_mm[1]-x_valid_lim_mm[0])/(x_valid_lim[1]-x_valid_lim[0])
 
@@ -249,3 +256,89 @@ class PAUT_Data():
 
         return np.array(tot_Ascans)
 
+
+
+    def Bscan_correction(self, data: np.ndarray, 
+                         angle: float, pitch: float, res_depth: float):
+        """
+        Apply geometrical correction to a B-Scan.
+
+        Parameters
+        ----------
+        data : (np.ndarray) 2-d array (raw B-Scan).
+        angle : (float) angle of the probe.
+        pitch : (float) horizontal resolution.
+        res_depth : (float) vetical resolution.
+
+        Returns
+        ----------
+        corrected_Bscan : (np.ndarray) 2-d array (corrected B-Scan).
+        
+        """
+        # preliminar computation of transformation parameters
+        angle_rad = angle*np.pi/180
+        res_y = res_depth/np.cos(angle_rad) # resolution in oblique direction
+        res_x = pitch*np.cos(angle_rad) 
+        shearY = pitch*np.sin(angle_rad)/res_y
+        rXY_factor = res_x/res_y
+
+
+        # SHEAR MAPPING (y axis)
+        rows, cols = data.shape
+        # preliminar padding 
+        data = np.pad(data, ((0, int(np.round(shearY*cols, 0))), (0, 0)),
+                      mode='constant', constant_values=np.nan)
+        # shear mapping
+        M_shear = np.array([[1, 0, 0],
+                            [shearY, 1, 0]], dtype=np.float32)
+        rows_m, cols_m = data.shape
+        data = cv.warpAffine(data, M_shear, (cols_m, rows_m),
+                             borderMode=cv.BORDER_CONSTANT, borderValue = np.nan,
+                             flags=cv.INTER_NEAREST)
+
+        # UPSAMPLING OF x AXIS (to match y resolution)
+        data = cv.resize(data, dsize = None, fx=rXY_factor, fy=1.,
+                         interpolation=cv.INTER_NEAREST_EXACT)
+        
+        # ROTATION
+        M_rotation = cv.getRotationMatrix2D([0,0], angle, scale=1)
+        rows_m, cols_m = data.shape
+        out_shape = (int(cols_m*np.cos(angle_rad)+rows_m*(np.sin(angle_rad))),
+                     int(rows_m*np.cos(angle_rad)-cols_m*(np.sin(angle_rad))))
+        data = cv.warpAffine(data, M_rotation, out_shape,
+                             borderMode=cv.BORDER_CONSTANT, borderValue = np.nan)
+        
+        # UPSAMPLE TO MATCH ORIGINAL Y-AXIS RESOLUTION
+        upsample_factor = rows/out_shape[1]
+        data = cv.resize(data, dsize = None, fx=upsample_factor, fy=upsample_factor,
+                         interpolation=cv.INTER_NEAREST_EXACT)
+            
+        return data
+
+
+
+    def extract_Bscan(self, ascans: np.ndarray, idx: int,
+                      correction: bool = False):
+        """
+        Extract a B-Scan from the 3D A-Scans set (geometrical correction
+        is optional).
+
+        Parameters
+        ----------
+        ascans : (np.ndarray) 3-d array (n. of L-elements x n. of spatial positions x time points)
+        idx : (int) spatial position index (x).
+        correction : (bool) apply geometrical correction.
+
+        Returns
+        ----------
+        Bscan : (np.ndarray) 2-d array (B-Scan).
+
+        """
+        bscan = ascans[:,idx].T.copy()
+        if correction:
+            bscan = self.Bscan_correction(bscan,
+                                          angle = self.metadata["angle"],
+                                          pitch = self.metadata["y_res"],
+                                          res_depth = self.metadata["t_res"]
+                                          )
+        return bscan

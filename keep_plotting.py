@@ -10,6 +10,8 @@ ascans = PAUT_Data(input_path).compose_Ascans()[:, 190:1760]
 while True:
     x_position = np.random.randint(0, ascans.shape[1])
     element_index = np.random.randint(0, ascans.shape[0])
+
+    print(f"Element index: {element_index}, X position: {x_position}")
     
     fig = plt.figure(figsize=(8,4), dpi=150, tight_layout=True)
     ax1 = fig.add_subplot(2, 1, 1)
@@ -18,6 +20,6 @@ while True:
     plot_Ascan(ascans, [element_index, x_position], ax1, color='tab:blue')
     plot_Cscan(ascans, ax2, vmin=0, vmax=100, cmap='jet')
 
-    ax2.plot(x_position, element_index, 'ro', markersize=5)
+    ax2.plot(x_position, 115-element_index, 'ro', markersize=5)
 
     plt.show()
