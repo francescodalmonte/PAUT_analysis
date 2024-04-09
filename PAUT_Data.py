@@ -91,7 +91,7 @@ class PAUT_Data():
         # y position
         y_N = 115
         y_lim_mm = [y_start_mm, y_end_mm]
-        y_res = (y_lim_mm[1]-y_lim_mm[0])/y_N
+        y_res = (y_lim_mm[1]-y_lim_mm[0])/y_N #= pitch
 
         # t position
         t_N = Ascan.shape[1]
@@ -115,21 +115,21 @@ class PAUT_Data():
     # coordinates conversions
     def xmm_to_idx(self, xmm):
         idx = (xmm-self.metadata["x_valid_lim_mm"][0])/self.metadata["x_res"] + self.metadata["x_valid_lim"][0]
-        return int(np.round(idx))
+        return np.round(idx).astype(int)
     
     def idx_to_xmm(self, idx):
         return idx*self.metadata["x_res"] + self.metadata["x_valid_lim_mm"][0]
     
     def ymm_to_idx(self, ymm):
         idx = (ymm-self.metadata["y_lim_mm"][0])/self.metadata["t_res"]
-        return int(np.round(idx))
+        return np.round(idx).astype(int)
     
     def idx_to_ymm(self, idx):
-        return (self.metadata["t_N"] -idx)*self.metadata["y_res"] + self.metadata["y_lim_mm"][0]
+        return idx*self.metadata["t_res"] + self.metadata["y_lim_mm"][0]
 
     def tmm_to_idx(self, tmm):
         idx = (tmm-self.metadata["t_lim_mm"][0])/self.metadata["t_res"]
-        return int(np.round(idx))
+        return np.round(idx).astype(int)
 
     def idx_to_tmm(self, idx):
         return idx*self.metadata["t_res"] + self.metadata["t_lim_mm"][0]
@@ -240,10 +240,14 @@ class PAUT_Data():
 
 
 
-    def compose_Ascans(self):
+    def compose_Ascans(self, valid: bool = True):
         """
         Compose all A-Scans in a unique 3-d array by looping over all the A-Scans of
         the acquisition, and stacking 2-d arrays on a new axis.
+
+        Parameters
+        ----------
+        valid : (bool) if True, only valid spatial positions are considered.
 
         Returns
         ----------
@@ -254,7 +258,13 @@ class PAUT_Data():
         for i in range(len(self.Ldirs)):
             tot_Ascans.append(self.get_linearAscans(i))
 
-        return np.array(tot_Ascans)
+        if valid:
+            xi = self.metadata["x_valid_lim"][0]
+            xf = self.metadata["x_valid_lim"][1]
+            print(xi, xf)
+            tot_Ascans = np.array(tot_Ascans)[:, xi:xf, :]
+            print(f"Valid spatial positions: {tot_Ascans.shape}")
+        return tot_Ascans
 
 
 
