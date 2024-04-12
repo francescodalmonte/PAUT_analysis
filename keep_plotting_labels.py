@@ -14,20 +14,20 @@ acq_names = ["1152811 45 S22 16dB",
              "1156722_NI6_M1LF67°_10dB",
              "1156722_NI7_M1LF45°_16dB",
              "1156722_NI7_M1LF67°_10dB",
-             "1157798_S22_T0199_LF45_18dB"]#,
-             #"1157978_NI5_M1LF45°_16dB",
-             #"1157978_NI8_M1LF45°_16dB",
-             #"FA1153222 SH83 LF45° 21dB",
-             #"FA1154309 SH83 LF45 22dB",
-             #"FA1154337 LH2-FM7_S2_45°_15dB",
-             #"FA1156470_23.03.21_S12_LF45°_18dB",
-             #"FA1156632 Lox_FM8_45°_17dB",
+             "1157798_S22_T0199_LF45_18dB",
+             "1157978_NI5_M1LF45°_16dB",
+             "1157978_NI8_M1LF45°_16dB",
+             "FA1153222 SH83 LF45° 21dB",
+             "FA1154309 SH83 LF45 22dB",
+             "FA1154337 LH2-FM7_S2_45°_15dB",
+             "FA1156470_23.03.21_S12_LF45°_18dB",
+             "FA1156632 Lox_FM8_45°_17dB",
              #"FA3566603_Naht1_LF45_21dB_runter",
              #"FA3566603_Naht1_LF67_16dB_hoch",
              #"FA3566603_Naht2_LF45_22dB_hoch",
              #"FA3566603_Naht2_LF67_17dB_hoch",
-             #"FA3566628_LF 45°_17dB_C-Ring",
-             #"FA3566742_NI2_45_Aufwärts",
+             "FA3566628_LF 45°_17dB_C-Ring",
+             "FA3566742_NI2_45_Aufwärts"]#,
              #"FA3566742_NI5_45_Aufwärts",
              #"FA3566923 S1 21db 45",
              #"FA3567052_S2_45_19dB",
@@ -57,7 +57,7 @@ for d in acq_names:
             
             print(f"x_c={x_c:.2f} - y_c={y_c:.2f} - t_c={t_c:.2f}")
 
-            ascans = obj.compose_Ascans()
+            ascans = obj.compose_Ascans(valid=False)
             print(ascans.shape)
 
             fig, ax = plt.subplots(ncols=1, nrows=2, figsize=(10,10), dpi=150, tight_layout=True)

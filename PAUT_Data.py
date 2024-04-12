@@ -91,12 +91,12 @@ class PAUT_Data():
         # y position
         y_N = 115
         y_lim_mm = [y_start_mm, y_end_mm]
-        y_res = (y_lim_mm[1]-y_lim_mm[0])/y_N #= pitch
+        y_res = (y_lim_mm[1]-y_lim_mm[0])/(y_N-1) #= pitch
 
         # t position
         t_N = Ascan.shape[1]
         t_lim_mm = [t_start_mm, t_end_mm]
-        t_res = (t_lim_mm[1]-t_lim_mm[0])/t_N
+        t_res = (t_lim_mm[1]-t_lim_mm[0])/(t_N-1)
         
         return {"x_N" : x_N,
                 "y_N" : y_N,
@@ -261,9 +261,10 @@ class PAUT_Data():
         if valid:
             xi = self.metadata["x_valid_lim"][0]
             xf = self.metadata["x_valid_lim"][1]
-            print(xi, xf)
             tot_Ascans = np.array(tot_Ascans)[:, xi:xf, :]
             print(f"Valid spatial positions: {tot_Ascans.shape}")
+        else:
+            tot_Ascans = np.array(tot_Ascans)
         return tot_Ascans
 
 
