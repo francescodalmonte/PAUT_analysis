@@ -19,6 +19,12 @@ class PAUT_Data():
         Ldirs_number = np.array([int(d.split(" ")[2][1:]) for d in self.Ldirs])
         self.Ldirs = self.Ldirs[Ldirs_number.argsort()]
 
+        # nugget crop definition
+        self.ncrop = {"top_mm" : -0.5,
+                      "left_mm" : -10.5,
+                      "right_mm" : 10.5
+        }
+
         # metadata
         if labelpath is not None:
             self.labelpath = labelpath
@@ -76,8 +82,8 @@ class PAUT_Data():
         labels = self.get_labelsFromCSV()
         x_start_mm = labels["x Start"].values[0]
         x_end_mm = labels["x Ende"].values[0]
-        y_start_mm = labels["y Start"].values[0]  # ****to be updated when available****
-        y_end_mm = labels["y Ende"].values[0]     # ****to be updated when available****
+        y_start_mm = labels["y Start"].values[0]
+        y_end_mm = labels["y Ende"].values[0]
         t_start_mm = labels["Tiefe Start"].values[0]
         t_end_mm = labels["Tiefe Ende"].values[0]
         angle = int(labels["Angle"].values[0].strip("°"))
@@ -133,6 +139,14 @@ class PAUT_Data():
 
     def idx_to_tmm(self, idx):
         return idx*self.metadata["t_res"] + self.metadata["t_lim_mm"][0]
+
+    def mm_to_cscanyidx(self, ymm, tmm):
+        dy = ymm - self.metadata["y_lim_mm"][0]
+        dt = tmm - self.metadata["t_lim_mm"][0]
+        dist = dy - dt*np.tan(self.metadata["angle"]*np.pi/180)
+        return 114-int(dist/self.metadata["y_res"])
+
+
 
         
     def get_stats(self):
@@ -353,3 +367,28 @@ class PAUT_Data():
                                           res_depth = self.metadata["t_res"]
                                           )
         return bscan
+    
+
+    def extract_ncrop(self, bscan: np.ndarray):
+        """
+        Extract nugget crop from a B-Scan.
+
+        Parameters
+        ----------
+        bscan : (np.ndarray) 2-d array (corrected B-Scan).
+
+        Returns
+        ----------
+        ncrop : (np.ndarray) 2-d array (nugget crop).
+
+        """
+        # nugget crops coordinates
+        top = self.tmm_to_idx(self.ncrop["top_mm"])
+        left, right = self.ymm_to_idx(np.array([self.ncrop["left_mm"], self.ncrop["right_mm"]]))
+
+        crop = bscan[top:, left:right]
+        nanheight = np.where(np.not_equal(crop, crop))[0].min()
+        crop = crop[:nanheight, :] # remove nan pixels
+
+        return crop
+
