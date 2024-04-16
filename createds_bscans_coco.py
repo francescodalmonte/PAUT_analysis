@@ -46,6 +46,7 @@ img_id = -1 # image counter
 
 info = {
     "year": '2024',
+    "description": '',
     "version": '1'
     }
 images = []
@@ -83,7 +84,7 @@ for d in acq_names:
             # draft for annotation dict
             annotation_drafts.append({
                 "acquisition": d,
-                "category_id": int(0),
+                "category_id": int(1),
                 "iscrowd": int(0),
                 "area": int(np.round((l_x/obj.metadata["t_res"])*(l_y/obj.metadata["t_res"]), 0)),
                 "bbox": [int(np.round(obj.ymm_to_idx(y_c-l_y/2)-left_ncrop, 0)),
