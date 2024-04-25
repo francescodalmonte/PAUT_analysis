@@ -51,6 +51,9 @@ info = {
     }
 images = []
 annotations = []
+categories = [{"supercategory": "anomaly",
+               "id": int(1),
+               "name": "flaw"}]
 
 for d in acq_names: 
     dirpath = os.path.join(basepath, d, d)
@@ -86,7 +89,7 @@ for d in acq_names:
                 "acquisition": d,
                 "category_id": int(1),
                 "iscrowd": int(0),
-                "area": int(np.round((l_x/obj.metadata["t_res"])*(l_y/obj.metadata["t_res"]), 0)),
+                "area": int(np.round((l_t/obj.metadata["t_res"])*(l_y/obj.metadata["t_res"]), 0)),
                 "bbox": [int(np.round(obj.ymm_to_idx(y_c-l_y/2)-left_ncrop, 0)),
                          int(np.round(obj.tmm_to_idx(t_c-l_t/2)-top_ncrop, 0)),
                          int(np.round(l_y/obj.metadata["t_res"], 0)),
@@ -94,6 +97,7 @@ for d in acq_names:
                          ]
             })
             has_anomalies[i, obj.xmm_to_idx(x_c-l_x/2):obj.xmm_to_idx(x_c+l_x/2)] = True
+        has_any_anomaly = np.unique(np.argwhere(has_anomalies)[:,1])
 
 
         # get anomalous ncrops
@@ -107,8 +111,8 @@ for d in acq_names:
 
             # anomalous idxs 
             all_anomalous_idxs = np.arange(obj.xmm_to_idx(x_c-l_x/2), obj.xmm_to_idx(x_c+l_x/2))
-            if len(all_anomalous_idxs)>5:
-                anomalous_idxs = np.random.choice(all_anomalous_idxs, 5, replace=False)
+            if len(all_anomalous_idxs)>4:
+                anomalous_idxs = np.random.choice(all_anomalous_idxs, 4, replace=False)
             else: 
                 anomalous_idxs = all_anomalous_idxs
 
@@ -117,6 +121,8 @@ for d in acq_names:
                 bscan = obj.extract_Bscan(ascans, i, correction = True)
                 crop = obj.extract_ncrop(bscan)
 
+                crop = crop + 1. + np.random.normal(0, 0.2, crop.shape)
+                crop = np.clip(crop, 0, 100)
                 crop = np.round(np.sqrt(crop)*255/10, 0).astype(np.uint8)
 
                 # assign label to img
@@ -135,44 +141,49 @@ for d in acq_names:
                     "acquisition": d,
                     "id": int(img_id),
                     "file_name": img_name,
+                    "folder": "anomalous",
                     "width": int(crop.shape[1]),
                     "height": int(crop.shape[0])
                     })
 
 
                 im = Image.fromarray(crop)
-                im.save("C:/users/dalmonte/data/ncrops_ds/anomalous/"+img_name)
+                im.save("C:/users/dalmonte/data/ADAMUS/ncrops datasets/ncrops_ds_V3/anomalous/"+img_name)
 
 
         # get normal ncrops
         imin, imax = obj.metadata["x_valid_lim"]
 
-        good_idxs = np.random.choice(np.setdiff1d(np.arange(imin, imax), all_anomalous_idxs), 100, replace=False)
+        good_idxs = np.random.choice(np.setdiff1d(np.arange(imin, imax), has_any_anomaly), 100, replace=False)
         for i in good_idxs:
             img_id += 1
             img_name = f"{d}_{i}.png"
 
             cscan = obj.extract_Bscan(ascans, i, correction = True)
             crop = obj.extract_ncrop(cscan)
-
+            
+            crop = crop + 1. + np.random.normal(0., 0.2, crop.shape)
+            crop = np.clip(crop, 0, 100)
             crop = np.round(np.sqrt(crop)*255/10, 0).astype(np.uint8)
 
             im = Image.fromarray(crop)
-            im.save("C:/users/dalmonte/data/ncrops_ds/normal/"+img_name)
+            im.save("C:/users/dalmonte/data/ADAMUS/ncrops datasets/ncrops_ds_V3/normal/"+img_name)
 
             images.append({
                 "acquisition": d,
                 "id": int(img_id),
                 "file_name": img_name,
+                "folder": "normal",
                 "width": int(crop.shape[1]),
                 "height": int(crop.shape[0])
                 })
             
 
-with open("C:/users/dalmonte/data/ncrops_ds/annotations.json", "w") as fp:
+with open("C:/users/dalmonte/data/ADAMUS/ncrops datasets/ncrops_ds_V3/annotations_v3.json", "w") as fp:
     j = {
         "info": info,
         "images": images,
-        "annotations": annotations
+        "annotations": annotations,
+        "categories": categories
     }
     json.dump(j, fp, indent = 4, sort_keys=True)

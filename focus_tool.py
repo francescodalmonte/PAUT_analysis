@@ -7,12 +7,12 @@ import plots_utils
 
 
 
-params = {"DIRPATH" : "C:/Users/dalmonte/data/ADAMUS/DFKI PAUT/FA3567389 S3 45 17db/FA3567389 S3 45 17db/45° 2195_",
-          "ELEMENT" : 51,
-          "POSITION" : 19000,
+params = {"DIRPATH" : "C:/Users/dalmonte/data/ADAMUS/DFKI PAUT/1152811 45 S22 16dB/1152811 45 S22 16dB/45° 2195_",
+          "ELEMENT" : 81,
+          "POSITION" : 3054,
           "THRESHOLD" : 0.,
           "ELEMENT_RANGE" : [],
-          "POSITION_RANGE" : [1000, 20000],
+          "POSITION_RANGE" : [2000, 4000],
           "TIME_RANGE" : []
           }
 
@@ -52,12 +52,16 @@ def plots(params):
                            c="tab:orange")
     ax1.set_xlim(time_range)
 
-    fig2, ax2 = plt.subplots(figsize=(4,4), dpi=150)
-    plots_utils.plot_Bscan(ascans, position, ax2, title = f"B-Scan [pos.{position}, th.{threshold}]", th=threshold,
-                           angle=45, pitch=.35, depth_resolution=.082,
+    fig2a, ax2a= plt.subplots(figsize=(4,4), dpi=150)
+    plots_utils.plot_Bscan(ascans, position, ax2a, title = f"B-Scan [pos.{position}, th.{threshold}]", th=threshold,
                            cmap="jet", vmin=0, vmax=100)
-    #ax2.set_xlim(element_range)
-    #ax2.set_ylim(time_range[::-1])    
+ 
+
+    fig2b, ax2b = plt.subplots(figsize=(7.5,4), dpi=150)
+    plots_utils.plot_Bscan_wcorrection(ascans, position, ax2b, angle=45, res_depth=0.05792, pitch=0.53,
+                                       title = f"B-Scan corrected [pos.{position}, th.{threshold}]", th=threshold,
+                                       cmap="jet", vmin=0, vmax=100)
+
     
     fig3, ax3 = plt.subplots(figsize=(12,4), dpi=150)
     plots_utils.plot_Dscan(ascans, element, ax3, title = f"D-Scan [elem.{element}, th.{threshold}]", th=threshold,
