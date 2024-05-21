@@ -1,14 +1,17 @@
 import os
 import numpy as np
 import pandas as pd
-import matplotlib.axes
 from matplotlib import pyplot as plt
 import cv2 as cv
 
-class PAUT_Data():
-    """Base class for PAUT data"""
+class PAUT_acquisition():
+    """Base class for PAUT_acquisition object"""
 
     def __init__(self, dirpath: str, labelpath: str = None):
+        """Instantiate a PAUT_acquisition object.
+        dirpath : (str) path to the directory containing the PAUT acquisition.
+        labelpath : (str) path to the .csv file containing the labels.
+        """
         self.dirpath = dirpath
 
         # acquisition name
@@ -32,33 +35,25 @@ class PAUT_Data():
 
 
     def checklabels(self, csv: pd.DataFrame):
+        """Check if labels file contains invalid values.
+        """
         if len(csv)==0:
             raise ValueError("No data found in labels file.")
-        if not (np.all(csv["x Start"] == csv["x Start"].values[0])
-                and np.all(csv["x Ende"] == csv["x Ende"].values[0])):
-            raise ValueError("x Start and x Ende are not constant (or may contain nans).")
-        elif not (np.all(csv["Tiefe Start"] == csv["Tiefe Start"].values[0])
-                  and np.all(csv["Tiefe Ende"] == csv["Tiefe Ende"].values[0])):
-            raise ValueError("Tiefe Start and Tiefe Ende are not constant (or may contain nans).")
-        elif not np.all(csv["X-Pos."] == csv["X-Pos."]):
-            raise ValueError("X-Pos. contains nans.") 
-        #elif not np.all(csv["Y-Pos."] == csv["Y-Pos."]):   # ****to be updated when available****
-        #    raise ValueError("Y-Pos. contains nans.")      # ****to be updated when available****
-        #elif not np.all(csv["Z-Pos."] == csv["Z-Pos."]):
-        #    raise ValueError("Z-Pos. contains nans.")      # ****to be updated when available****
-        elif not np.all(csv["Länge l"] == csv["Länge l"]):
-            raise ValueError("Länge l contains nans.")
-        #elif not np.all(csv["Breite b"] == csv["Breite b"]):
-        #    raise ValueError("Breite b contains nans.")    # ****to be updated when available****
-        #elif not np.all(csv["Tiefe t"] == csv["Tiefe t"]):
-        #    raise ValueError("Tiefe t contains nans.")     # ****to be updated when available****
-        else:
-            return 0
+        for s, e in zip(["x Start", "y Start", "Tiefe Start"], ["x Ende", "y Ende", "Tiefe Ende"]):
+            if not (np.all(csv[s] == csv[s].values[0])
+                and np.all(csv[e] == csv[e].values[0])):
+                raise ValueError(f"{s} and {e} are not constant (or may contain nans).")
+            else:
+                continue
+        for p in ["X-Pos.", "Y-Pos.", "Z-Pos.", "Länge l", "Breite b", "Tiefe t"]:
+            if not np.all(csv[p] == csv[p]):
+                raise ValueError(f"{p} contain nans.")
+            else:
+                continue
 
 
     def get_labelsFromCSV(self):
-        """
-        Get labels info from .csv file.
+        """Get labels info from .csv file.
         """
         if os.path.isfile(self.labelpath):
             csv = pd.read_csv(self.labelpath, encoding='latin')
@@ -141,6 +136,7 @@ class PAUT_Data():
         return idx*self.metadata["t_res"] + self.metadata["t_lim_mm"][0]
 
     def mm_to_cscanyidx(self, ymm, tmm):
+        """Converts mm coordinates to C-Scan y index (vertical axis)."""
         dy = ymm - self.metadata["y_lim_mm"][0]
         dt = tmm - self.metadata["t_lim_mm"][0]
         dist = dy - dt*np.tan(self.metadata["angle"]*np.pi/180)
@@ -286,7 +282,7 @@ class PAUT_Data():
     def Bscan_correction(self, data: np.ndarray, 
                          angle: float, pitch: float, res_depth: float):
         """
-        Apply geometrical correction to a B-Scan.
+        Apply geometrical correction to a raw B-Scan.
 
         Parameters
         ----------

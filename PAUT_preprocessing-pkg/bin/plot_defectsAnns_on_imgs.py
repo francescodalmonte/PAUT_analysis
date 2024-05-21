@@ -3,13 +3,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 import cv2 as cv
 
-from PAUT_Data import PAUT_Data
-import plots_utils
+from PAUT_preprocessing.PAUT_acquisition import PAUT_acquisition
+import PAUT_preprocessing.plot_utils as plots_utils
 
-basepath = "C:/Users/dalmonte/data/ADAMUS/DFKI PAUT/"
-labelpath = "C:/Users/dalmonte/data/ADAMUS/labelling files/240312_M_Adamus_Anzeigen_DFKI_SUB_refined.csv"
-
-acq_names = ["1152811 45 S22 16dB",
+valid_acq_names = ["1152811 45 S22 16dB",
              "1156722_NI6_M1LF45°_16dB",
              "1156722_NI6_M1LF67°_10dB",
              "1156722_NI7_M1LF45°_16dB",
@@ -38,13 +35,20 @@ acq_names = ["1152811 45 S22 16dB",
              #"FA3569155_S13_45°"
 ]
 
+params = {"BASEPATH" : "C:/Users/dalmonte/data/ADAMUS/DFKI PAUT/",
+          "LABELPATH" : "C:/Users/dalmonte/data/ADAMUS/labelling files/240312_M_Adamus_Anzeigen_DFKI_SUB_refined.csv",
+          "ACQ_NAME" : "1152811 45 S22 16dB"
+          }
 
-for d in acq_names: 
-    dirpath = os.path.join(basepath, d, d)
+
+
+def plot(basepath, labelpath, acq_name):
+
+    dirpath = os.path.join(basepath, acq_name, acq_name)    
     for sd in os.listdir(dirpath):
-        print(f"Processing {d}/{sd}")
+        print(f"Processing {acq_name}/{sd}")
         subdirpath = os.path.join(dirpath, sd)
-        obj = PAUT_Data(subdirpath, labelpath=labelpath)
+        obj = PAUT_acquisition(subdirpath, labelpath=labelpath)
         labels = obj.get_labelsFromCSV()
         print(f"Found: {len(labels)} labelled defect(s)")
         for i in range(len(labels)):
@@ -58,44 +62,48 @@ for d in acq_names:
             print(f"x_c={x_c:.2f} - y_c={y_c:.2f} - t_c={t_c:.2f}")
 
             ascans = obj.compose_Ascans(valid=False)
-            print(ascans.shape)
+            print(f"Ascans shape: {ascans.shape}")
 
-            fig, ax = plt.subplots(ncols=1, nrows=2, figsize=(10,10), dpi=150, tight_layout=True)
+            fig, ax = plt.subplots(ncols=1, nrows=2, figsize=(8,8), tight_layout=True)
             
             # plot cscan
-            plots_utils.plot_Cscan(ascans, ax[0], title = f"C-Scan {d}/{sd}",
+            plots_utils.plot_Cscan(ascans, ax[0], title = f"C-Scan {acq_name}/{sd}",
                                    cmap="jet", vmin=0, vmax=100)
-            position_range = [obj.xmm_to_idx(x_c-250), obj.xmm_to_idx(x_c+250)]
+            position_range = [obj.xmm_to_idx(x_c-200), obj.xmm_to_idx(x_c+200)]
             ax[0].set_xlim(position_range)
-            ax[0].axvline(obj.xmm_to_idx(x_c - l_x/2), color='black', linestyle='--', linewidth=0.6)
-            ax[0].axvline(obj.xmm_to_idx(x_c + l_x/2), color='black', linestyle='--', linewidth=0.6)
-            ax[0].axhline(obj.mm_to_cscanyidx(y_c-l_y/2, t_c+l_t/2), color='black', linestyle='--', linewidth=0.6)
-            ax[0].axhline(obj.mm_to_cscanyidx(y_c+l_y/2, t_c-l_t/2), color='black', linestyle='--', linewidth=0.6)
+            ax[0].axvline(obj.xmm_to_idx(x_c - l_x/2), color='black', linestyle='--', linewidth=0.8)
+            ax[0].axvline(obj.xmm_to_idx(x_c + l_x/2), color='black', linestyle='--', linewidth=0.8)
+            ax[0].axhline(obj.mm_to_cscanyidx(y_c-l_y/2, t_c+l_t/2), color='black', linestyle='--', linewidth=0.8)
+            ax[0].axhline(obj.mm_to_cscanyidx(y_c+l_y/2, t_c-l_t/2), color='black', linestyle='--', linewidth=0.8)
 
 
             # plot bscan
             corrBscan = obj.extract_Bscan(ascans, 
                                           idx = obj.xmm_to_idx(x_c),
                                           correction = True
-            )
-            Bshape = corrBscan.shape
+                                    )
+            print(f"Corr. Bscan shape: {corrBscan.shape}")
 
             ax[1].imshow(corrBscan, aspect='equal', cmap='jet', vmin=0, vmax=100)
-            ax[1].set_title(f"B-Scan {d}/{sd}")
+            ax[1].set_title(f"B-Scan {acq_name}/{sd}")
             
             # anomaly lines
-            ax[1].axhline(obj.tmm_to_idx(t_c - l_t/2), color='black', linestyle='--', linewidth=0.6)
-            ax[1].axhline(obj.tmm_to_idx(t_c + l_t/2), color='black', linestyle='--', linewidth=0.6)
-            ax[1].axvline(obj.ymm_to_idx(y_c - l_y/2), color='black', linestyle='--', linewidth=0.6)
-            ax[1].axvline(obj.ymm_to_idx(y_c + l_y/2), color='black', linestyle='--', linewidth=0.6)
+            ax[1].axhline(obj.tmm_to_idx(t_c - l_t/2), color='black', linestyle='--', linewidth=0.8)
+            ax[1].axhline(obj.tmm_to_idx(t_c + l_t/2), color='black', linestyle='--', linewidth=0.8)
+            ax[1].axvline(obj.ymm_to_idx(y_c - l_y/2), color='black', linestyle='--', linewidth=0.8)
+            ax[1].axvline(obj.ymm_to_idx(y_c + l_y/2), color='black', linestyle='--', linewidth=0.8)
 
             # nugget lines
             ax[1].axhline(obj.tmm_to_idx(0.), color='white', linestyle='-', linewidth=0.4)
             ax[1].axvline(obj.ymm_to_idx(0.), ymax=obj.tmm_to_idx(0.), color='white', linestyle='-', linewidth=0.4)
 
-            plt.show()
+        plt.show()
         
 
-
+if __name__ == "__main__":
+    plot(params["BASEPATH"],
+         params["LABELPATH"],
+         params["ACQ_NAME"]
+    )
 
 
