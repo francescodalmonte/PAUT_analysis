@@ -51,6 +51,8 @@ def plot(basepath, labelpath, acq_name):
         obj = PAUT_acquisition(subdirpath, labelpath=labelpath)
         labels = obj.get_labelsFromCSV()
         print(f"Found: {len(labels)} labelled defect(s)")
+        ascans = obj.compose_Ascans(valid=False)
+        print(f"Ascans shape: {ascans.shape}")
         for i in range(len(labels)):
             l_x = labels['Länge l'].values[i]
             x_c = labels['X-Pos.'].values[i] + l_x/2
@@ -60,9 +62,6 @@ def plot(basepath, labelpath, acq_name):
             y_c = labels['Y-Pos.'].values[i] + l_y/2
             
             print(f"x_c={x_c:.2f} - y_c={y_c:.2f} - t_c={t_c:.2f}")
-
-            ascans = obj.compose_Ascans(valid=False)
-            print(f"Ascans shape: {ascans.shape}")
 
             fig, ax = plt.subplots(ncols=1, nrows=2, figsize=(8,8), tight_layout=True)
             

@@ -38,8 +38,8 @@ class COCOParser:
         return [self.cat_dict[class_id] for class_id in class_ids]
 
 
-annotations_path = "C:/users/dalmonte/data/ncrops_ds/annotations.json"
-images_path = "C:/users/dalmonte/data/ncrops_ds/"
+annotations_path = "C:/users/dalmonte/data/ADAMUS/ncrops datasets/ncrops_ds/annotations.json"
+images_path = "C:/users/dalmonte/data/ADAMUS/ncrops datasets/ncrops_ds/"
 cocop = COCOParser(annotations_path, images_path)
 
 
