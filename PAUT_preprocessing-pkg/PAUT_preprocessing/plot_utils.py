@@ -3,6 +3,8 @@ import matplotlib.axes
 from matplotlib import pyplot as plt
 import cv2 as cv
 
+from PAUT_preprocessing.PAUT_acquisition import PAUT_acquisition
+
 
 def plot_Ascan(data: np.ndarray, 
                idxs: list[int,],
@@ -30,7 +32,14 @@ def plot_Ascan(data: np.ndarray,
     return data[idxs[0], idxs[1]]
 
 
-def plot_Bscan():
+def plot_Bscan(data: np.ndarray,
+               obj: PAUT_acquisition,
+               idx: int,
+               ax: matplotlib.axes.Axes,
+               title: str = "B-Scan",
+               th: float = 0.,
+               correction: bool = False,
+               **kwargs):
     """
     Plot a 2-d cross sectional B-Scan on an existing axis.
 
@@ -38,15 +47,34 @@ def plot_Bscan():
     ----------
 
     """
-    # TODO
-    pass
+    bscan = obj.extract_Bscan(data, idx, correction = correction)
+    bscan[bscan<th]=np.nan
+    
+    ax.imshow(bscan, aspect='equal', **kwargs)
+    ax.set_title(title)
+
+    if correction:
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("Time/depth (mm)")
+    
+        xt, yt = np.arange(0, bscan.shape[1], 100), np.arange(0, bscan.shape[0], 50)
+        xtl, ytl = np.round((obj.idx_to_ymm(xt)), 1), np.round((obj.idx_to_tmm(yt)), 1)
+        ax.set_xticks(xt)
+        ax.set_yticks(yt)
+        ax.set_xticklabels(xtl)
+        ax.set_yticklabels(ytl)
+
+    else:
+        ax.set_xlabel("Position (au)")
+        ax.set_ylabel("Time/depth (au)")
+
+    return bscan
 
 
 def plot_Cscan(data: np.ndarray, 
                ax: matplotlib.axes.Axes,
                title: str = "C-Scan",
                th: float = 0.,
-               pos_mm: np.ndarray = None,
                **kwargs):
     """
     Plot a 2-d C-Scan on an existing axis.
@@ -64,13 +92,7 @@ def plot_Cscan(data: np.ndarray,
     cscan[cscan<th]=np.nan
 
     ax.imshow(cscan, aspect='auto', **kwargs)
-    if pos_mm is None:
-        ax.set_xlabel("Position (au)")
-    else:
-        ax.set_xlabel("Position (mm)")
-        ax.set_xticks(np.arange(0, len(pos_mm), int(len(pos_mm)/10)))
-        ax.set_xticklabels(pos_mm[::int(len(pos_mm)/10)])
-
+    ax.set_xlabel("Position (au)")
     ax.set_ylabel("Elements")
     ax.set_title(title)
 
